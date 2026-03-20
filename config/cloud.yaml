@@ -1,0 +1,37 @@
+name: rag-demo-cloud
+description: Cloud stack — Azure DI + semantic chunking + OpenAI embeddings + Pinecone
+
+parser:
+  implementation: azure_di
+  azure_endpoint: ""        # set via AZURE_DI_ENDPOINT env var
+  azure_api_key: ""         # set via AZURE_DI_KEY env var
+  azure_model_id: prebuilt-document
+
+chunker:
+  implementation: semantic
+  similarity_threshold: 0.78
+  min_chunk_size: 150
+  max_chunk_size: 1024
+
+embedder:
+  implementation: openai
+  api_key: ""               # set via OPENAI_API_KEY env var
+  model: text-embedding-3-small
+
+vector_store:
+  implementation: pinecone
+  collection_name: rag-demo-cloud
+  pinecone_api_key: ""      # set via PINECONE_API_KEY env var
+  pinecone_index_name: rag-demo
+  embedding_dim: 1536       # text-embedding-3-small output dim
+
+retriever:
+  implementation: semantic
+  top_k: 5
+
+evaluator:
+  enable_retrieval_metrics: true
+  enable_parsing_metrics: true
+  enable_chunking_metrics: true
+  enable_answer_metrics: false
+  k_values: [1, 3, 5]

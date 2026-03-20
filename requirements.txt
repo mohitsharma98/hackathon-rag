@@ -1,0 +1,33 @@
+# ============================================================
+# RAG Framework — flat requirements for quick pip install
+# ============================================================
+# For a proper install use: pip install -e ".[local,ui]"
+# This file is provided for environments that need a flat list.
+
+# --- Core (always) ---
+pydantic>=2.6
+pyyaml>=6.0
+
+# --- Local stack ---
+pdfplumber>=0.11
+pymupdf>=1.24
+sentence-transformers>=3.0
+chromadb>=0.5
+qdrant-client>=1.9
+rank-bm25>=0.2
+
+# --- Cloud stack (comment out if not needed) ---
+openai>=1.30
+azure-ai-documentintelligence>=1.0
+azure-search-documents>=11.6
+azure-core>=1.30
+pinecone-client>=4.0
+
+# --- UI ---
+streamlit>=1.35
+pandas>=2.0
+
+# --- Dev ---
+pytest>=8.0
+pytest-cov>=5.0
+ruff>=0.4

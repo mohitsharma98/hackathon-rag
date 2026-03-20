@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local data stores
+.chromadb/
+.qdrant/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Secrets / env
+.env
+*.local.yaml
+
+# Test output
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Streamlit
+.streamlit/
+
+# macOS
+.DS_Store

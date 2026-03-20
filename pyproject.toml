@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "rag-framework"
+version = "0.1.0"
+description = "Modular, evaluation-first RAG framework demo"
+readme = "README.md"
+requires-python = ">=3.11"
+
+# Core — always required
+dependencies = [
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Local stack (no cloud credentials needed)
+local = [
+    "pdfplumber>=0.11",
+    "pymupdf>=1.24",            # provides 'fitz'
+    "sentence-transformers>=3.0",
+    "chromadb>=0.5",
+    "qdrant-client>=1.9",
+    "rank-bm25>=0.2",           # hybrid retrieval
+]
+
+# Cloud stack
+cloud = [
+    "openai>=1.30",
+    "azure-ai-documentintelligence>=1.0",
+    "azure-search-documents>=11.6",
+    "azure-core>=1.30",
+    "pinecone-client>=4.0",
+]
+
+# UI
+ui = [
+    "streamlit>=1.35",
+    "pandas>=2.0",
+]
+
+# Development & testing
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+
+# Install everything
+all = [
+    "rag-framework[local,cloud,ui,dev]",
+]
+
+[project.scripts]
+rag-ui = "rag_framework.ui.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rag_framework*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

@@ -1,0 +1,35 @@
+name: rag-demo-default
+description: Local stack — pdfplumber + recursive chunking + MiniLM + ChromaDB
+
+parser:
+  implementation: pdfplumber
+  extract_images: false
+
+chunker:
+  implementation: recursive
+  chunk_size: 512
+  chunk_overlap: 64
+  separators: ["\n\n", "\n", ". ", " "]
+
+embedder:
+  implementation: sentence_transformers
+  local_model_name: all-MiniLM-L6-v2
+  device: cpu
+  batch_size: 32
+
+vector_store:
+  implementation: chromadb
+  collection_name: rag_demo
+  chromadb_path: ./.chromadb
+  embedding_dim: 384
+
+retriever:
+  implementation: semantic
+  top_k: 5
+
+evaluator:
+  enable_retrieval_metrics: true
+  enable_parsing_metrics: true
+  enable_chunking_metrics: true
+  enable_answer_metrics: false
+  k_values: [1, 3, 5]
