@@ -78,8 +78,10 @@ pip install -e ".[local,ui]"
 ### 2. Launch the UI
 
 ```bash
-streamlit run rag_framework/ui/app.py
+uvicorn rag_framework.server.app:app --reload --port 8000
 ```
+
+Open **http://localhost:8000** in your browser.
 
 ### 3. Run via Python API
 
@@ -212,7 +214,7 @@ To add a new implementation (e.g. a new parser):
 
 ## Demo script (10-minute walkthrough)
 
-1. Open the UI: `streamlit run rag_framework/ui/app.py`
+1. Open the UI: `uvicorn rag_framework.server.app:app --reload --port 8000`
 2. **Configure** tab → select local stack → click **Validate backends** → all green.
 3. **Evaluate** tab → upload a PDF → click **Run Ingestion** → see chunk count + parse time.
 4. **Query** tab → ask a question → inspect retrieved chunks + scores.

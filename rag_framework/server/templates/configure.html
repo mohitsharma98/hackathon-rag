@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+{% block title %}Configure — RAG Framework{% endblock %}
+
+{% block content %}
+<div class="configure-layout" x-data="configureApp()">
+
+  <!-- ── Left: Module selector sidebar ── -->
+  <aside class="module-sidebar">
+    <div class="sidebar-header">MODULES</div>
+
+    <template x-for="mod in modules" :key="mod.key">
+      <button
+        class="module-item"
+        :class="{ active: activeModule === mod.key }"
+        @click="activeModule = mod.key"
+      >
+        <span class="module-item-icon" x-text="mod.icon"></span>
+        <span class="module-item-label" x-text="mod.label"></span>
+        <span class="module-item-impl mono" x-text="implLabel(mod.key)"></span>
+      </button>
+    </template>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- Pipeline name -->
+    <div class="sidebar-field">
+      <label class="field-label">PIPELINE NAME</label>
+      <input class="input-text" type="text" x-model="config.name" @input="debouncedPreview()" />
+    </div>
+  </aside>
+
+  <!-- ── Center: Config panel ── -->
+  <section class="config-panel">
+    <div class="panel-header">
+      <span class="panel-title" x-text="activeModuleLabel()"></span>
+      <span class="panel-subtitle" x-text="activeModuleDesc()"></span>
+    </div>
+
+    <!-- PARSER -->
+    <div x-show="activeModule === 'parser'" x-transition>
+      <div class="field-group">
+        <label class="field-label">IMPLEMENTATION</label>
+        <div class="impl-cards">
+          <template x-for="opt in parserOptions" :key="opt.value">
+            <button class="impl-card" :class="{active: config.parser.implementation === opt.value}"
+              @click="config.parser.implementation = opt.value; debouncedPreview()">
+              <span class="impl-card-badge" x-text="opt.badge"></span>
+              <span class="impl-card-name" x-text="opt.label"></span>
+              <span class="impl-card-desc" x-text="opt.desc"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <template x-if="config.parser.implementation === 'azure_di'">
+        <div class="field-group">
+          <div class="field-row">
+            <div class="field-col">
+              <label class="field-label">AZURE DI ENDPOINT</label>
+              <input class="input-text" type="text" placeholder="https://…" x-model="config.parser.azure_endpoint" />
+            </div>
+            <div class="field-col">
+              <label class="field-label">API KEY</label>
+              <input class="input-text" type="password" placeholder="••••••••" x-model="config.parser.azure_api_key" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-col">
+              <label class="field-label">MODEL ID</label>
+              <input class="input-text" type="text" x-model="config.parser.azure_model_id" />
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- CHUNKER -->
+    <div x-show="activeModule === 'chunker'" x-transition>
+      <div class="field-group">
+        <label class="field-label">IMPLEMENTATION</label>
+        <div class="impl-cards">
+          <template x-for="opt in chunkerOptions" :key="opt.value">
+            <button class="impl-card" :class="{active: config.chunker.implementation === opt.value}"
+              @click="config.chunker.implementation = opt.value; debouncedPreview()">
+              <span class="impl-card-badge" x-text="opt.badge"></span>
+              <span class="impl-card-name" x-text="opt.label"></span>
+              <span class="impl-card-desc" x-text="opt.desc"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <template x-if="config.chunker.implementation === 'recursive'">
+        <div class="field-group">
+          <div class="slider-field">
+            <div class="slider-header">
+              <label class="field-label">CHUNK SIZE</label>
+              <span class="slider-value mono" x-text="config.chunker.chunk_size + ' chars'"></span>
+            </div>
+            <input type="range" class="range-input" min="64" max="2048" step="64"
+              x-model.number="config.chunker.chunk_size" @input="debouncedPreview()" />
+            <div class="range-marks"><span>64</span><span>512</span><span>1024</span><span>2048</span></div>
+          </div>
+          <div class="slider-field">
+            <div class="slider-header">
+              <label class="field-label">OVERLAP</label>
+              <span class="slider-value mono" x-text="config.chunker.chunk_overlap + ' chars'"></span>
+            </div>
+            <input type="range" class="range-input" min="0" max="512" step="16"
+              x-model.number="config.chunker.chunk_overlap" @input="debouncedPreview()" />
+            <div class="range-marks"><span>0</span><span>128</span><span>256</span><span>512</span></div>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="config.chunker.implementation === 'semantic'">
+        <div class="field-group">
+          <div class="slider-field">
+            <div class="slider-header">
+              <label class="field-label">SIMILARITY THRESHOLD</label>
+              <span class="slider-value mono" x-text="config.chunker.similarity_threshold.toFixed(2)"></span>
+            </div>
+            <input type="range" class="range-input" min="0.5" max="0.99" step="0.01"
+              x-model.number="config.chunker.similarity_threshold" @input="debouncedPreview()" />
+            <div class="range-marks"><span>0.50</span><span>0.70</span><span>0.85</span><span>0.99</span></div>
+          </div>
+          <div class="field-row">
+            <div class="field-col">
+              <label class="field-label">MIN CHUNK (chars)</label>
+              <input class="input-text" type="number" x-model.number="config.chunker.min_chunk_size" />
+            </div>
+            <div class="field-col">
+              <label class="field-label">MAX CHUNK (chars)</label>
+              <input class="input-text" type="number" x-model.number="config.chunker.max_chunk_size" />
+            </div>
+          </div>
+          <div class="callout callout-info">Semantic chunker uses the configured embedder — ensure it is set up first.</div>
+        </div>
+      </template>
+    </div>
+
+    <!-- EMBEDDER -->
+    <div x-show="activeModule === 'embedder'" x-transition>
+      <div class="field-group">
+        <label class="field-label">IMPLEMENTATION</label>
+        <div class="impl-cards">
+          <template x-for="opt in embedderOptions" :key="opt.value">
+            <button class="impl-card" :class="{active: config.embedder.implementation === opt.value}"
+              @click="config.embedder.implementation = opt.value; debouncedPreview()">
+              <span class="impl-card-badge" x-text="opt.badge"></span>
+              <span class="impl-card-name" x-text="opt.label"></span>
+              <span class="impl-card-desc" x-text="opt.desc"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <template x-if="config.embedder.implementation === 'sentence_transformers'">
+        <div class="field-group">
+          <label class="field-label">HUGGINGFACE MODEL</label>
+          <input class="input-text" type="text" placeholder="all-MiniLM-L6-v2"
+            x-model="config.embedder.local_model_name" />
+          <div class="field-row" style="margin-top:12px">
+            <div class="field-col">
+              <label class="field-label">DEVICE</label>
+              <select class="input-select" x-model="config.embedder.device">
+                <option value="cpu">cpu</option>
+                <option value="cuda">cuda</option>
+                <option value="mps">mps (Apple Silicon)</option>
+              </select>
+            </div>
+            <div class="field-col">
+              <label class="field-label">BATCH SIZE</label>
+              <input class="input-text" type="number" x-model.number="config.embedder.batch_size" />
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="config.embedder.implementation === 'openai' || config.embedder.implementation === 'azure_openai'">
+        <div class="field-group">
+          <div class="field-row">
+            <div class="field-col">
+              <label class="field-label">API KEY</label>
+              <input class="input-text" type="password" placeholder="sk-…" x-model="config.embedder.api_key" />
+            </div>
+            <div class="field-col">
+              <label class="field-label">MODEL</label>
+              <input class="input-text" type="text" x-model="config.embedder.model" />
+            </div>
+          </div>
+          <template x-if="config.embedder.implementation === 'azure_openai'">
+            <div class="field-row" style="margin-top:12px">
+              <div class="field-col">
+                <label class="field-label">AZURE ENDPOINT</label>
+                <input class="input-text" type="text" placeholder="https://…" x-model="config.embedder.azure_endpoint" />
+              </div>
+              <div class="field-col">
+                <label class="field-label">DEPLOYMENT NAME</label>
+                <input class="input-text" type="text" x-model="config.embedder.azure_deployment" />
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <!-- VECTOR STORE -->
+    <div x-show="activeModule === 'vector_store'" x-transition>
+      <div class="field-group">
+        <label class="field-label">IMPLEMENTATION</label>
+        <div class="impl-cards">
+          <template x-for="opt in vectorStoreOptions" :key="opt.value">
+            <button class="impl-card" :class="{active: config.vector_store.implementation === opt.value}"
+              @click="config.vector_store.implementation = opt.value; debouncedPreview()">
+              <span class="impl-card-badge" x-text="opt.badge"></span>
+              <span class="impl-card-name" x-text="opt.label"></span>
+              <span class="impl-card-desc" x-text="opt.desc"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-col">
+          <label class="field-label">COLLECTION NAME</label>
+          <input class="input-text" type="text" x-model="config.vector_store.collection_name" />
+        </div>
+        <div class="field-col">
+          <label class="field-label">EMBEDDING DIM</label>
+          <input class="input-text" type="number" x-model.number="config.vector_store.embedding_dim"
+            placeholder="384" />
+        </div>
+      </div>
+
+      <template x-if="config.vector_store.implementation === 'chromadb'">
+        <div class="field-group" style="margin-top:12px">
+          <label class="field-label">PERSIST PATH</label>
+          <input class="input-text" type="text" x-model="config.vector_store.chromadb_path" />
+        </div>
+      </template>
+
+      <template x-if="config.vector_store.implementation === 'qdrant_local'">
+        <div class="field-group" style="margin-top:12px">
+          <label class="field-label">PERSIST PATH</label>
+          <input class="input-text" type="text" x-model="config.vector_store.qdrant_path" />
+        </div>
+      </template>
+
+      <template x-if="config.vector_store.implementation === 'pinecone'">
+        <div class="field-group" style="margin-top:12px">
+          <div class="field-row">
+            <div class="field-col">
+              <label class="field-label">PINECONE API KEY</label>
+              <input class="input-text" type="password" x-model="config.vector_store.pinecone_api_key" />
+            </div>
+            <div class="field-col">
+              <label class="field-label">INDEX NAME</label>
+              <input class="input-text" type="text" x-model="config.vector_store.pinecone_index_name" />
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="config.vector_store.implementation === 'azure_search'">
+        <div class="field-group" style="margin-top:12px">
+          <div class="field-row">
+            <div class="field-col">
+              <label class="field-label">ENDPOINT</label>
+              <input class="input-text" type="text" x-model="config.vector_store.azure_search_endpoint" />
+            </div>
+            <div class="field-col">
+              <label class="field-label">API KEY</label>
+              <input class="input-text" type="password" x-model="config.vector_store.azure_search_api_key" />
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            <label class="field-label">INDEX NAME</label>
+            <input class="input-text" type="text" x-model="config.vector_store.azure_search_index_name" />
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- RETRIEVER -->
+    <div x-show="activeModule === 'retriever'" x-transition>
+      <div class="field-group">
+        <label class="field-label">IMPLEMENTATION</label>
+        <div class="impl-cards">
+          <template x-for="opt in retrieverOptions" :key="opt.value">
+            <button class="impl-card" :class="{active: config.retriever.implementation === opt.value}"
+              @click="config.retriever.implementation = opt.value; debouncedPreview()">
+              <span class="impl-card-badge" x-text="opt.badge"></span>
+              <span class="impl-card-name" x-text="opt.label"></span>
+              <span class="impl-card-desc" x-text="opt.desc"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <div class="slider-field">
+        <div class="slider-header">
+          <label class="field-label">TOP-K RESULTS</label>
+          <span class="slider-value mono" x-text="config.retriever.top_k"></span>
+        </div>
+        <input type="range" class="range-input" min="1" max="20" step="1"
+          x-model.number="config.retriever.top_k" @input="debouncedPreview()" />
+        <div class="range-marks"><span>1</span><span>5</span><span>10</span><span>20</span></div>
+      </div>
+
+      <template x-if="config.retriever.implementation === 'hybrid'">
+        <div class="field-group">
+          <div class="slider-field">
+            <div class="slider-header">
+              <label class="field-label">VECTOR WEIGHT</label>
+              <span class="slider-value mono" x-text="config.retriever.vector_weight.toFixed(2)"></span>
+            </div>
+            <input type="range" class="range-input" min="0" max="1" step="0.05"
+              x-model.number="config.retriever.vector_weight"
+              @input="config.retriever.bm25_weight = +(1 - config.retriever.vector_weight).toFixed(2); debouncedPreview()" />
+          </div>
+          <div class="slider-field">
+            <div class="slider-header">
+              <label class="field-label">BM25 WEIGHT</label>
+              <span class="slider-value mono" x-text="config.retriever.bm25_weight.toFixed(2)"></span>
+            </div>
+            <input type="range" class="range-input" min="0" max="1" step="0.05"
+              x-model.number="config.retriever.bm25_weight"
+              @input="config.retriever.vector_weight = +(1 - config.retriever.bm25_weight).toFixed(2); debouncedPreview()" />
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- EVALUATOR -->
+    <div x-show="activeModule === 'evaluator'" x-transition>
+      <div class="field-group">
+        <label class="field-label">METRIC GROUPS</label>
+        <div class="toggle-list">
+          <label class="toggle-row">
+            <span class="toggle-label">Retrieval metrics <span class="tag">Recall · Precision · MRR · NDCG</span></span>
+            <input type="checkbox" class="toggle-input" x-model="config.evaluator.enable_retrieval_metrics" />
+            <span class="toggle-track"></span>
+          </label>
+          <label class="toggle-row">
+            <span class="toggle-label">Parsing metrics <span class="tag">Completeness · Latency</span></span>
+            <input type="checkbox" class="toggle-input" x-model="config.evaluator.enable_parsing_metrics" />
+            <span class="toggle-track"></span>
+          </label>
+          <label class="toggle-row">
+            <span class="toggle-label">Chunking metrics <span class="tag">Coherence · Variance</span></span>
+            <input type="checkbox" class="toggle-input" x-model="config.evaluator.enable_chunking_metrics" />
+            <span class="toggle-track"></span>
+          </label>
+          <label class="toggle-row">
+            <span class="toggle-label">Answer metrics <span class="tag">LLM judge — optional</span></span>
+            <input type="checkbox" class="toggle-input" x-model="config.evaluator.enable_answer_metrics" />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">K VALUES</label>
+        <input class="input-text" type="text"
+          :value="config.evaluator.k_values.join(', ')"
+          @change="config.evaluator.k_values = $event.target.value.split(',').map(v => parseInt(v.trim())).filter(Boolean)" />
+        <span class="field-hint">Comma-separated integers, e.g. 1, 3, 5</span>
+      </div>
+    </div>
+
+    <!-- Action bar -->
+    <div class="action-bar">
+      <button class="btn btn-primary" @click="saveAndValidate()" :disabled="validating">
+        <span x-show="!validating">✦ Validate Pipeline</span>
+        <span x-show="validating" class="loading-dots">Validating</span>
+      </button>
+      <button class="btn btn-ghost" @click="saveConfig()">Save</button>
+      <button class="btn btn-ghost" @click="exportYAML()">↓ Export YAML</button>
+      <label class="btn btn-ghost" style="cursor:pointer">
+        ↑ Import YAML
+        <input type="file" accept=".yaml,.yml" style="display:none" @change="importYAML($event)" />
+      </label>
+    </div>
+
+    <!-- Validation results -->
+    <div x-show="validationResults.length > 0" x-transition class="validation-panel">
+      <div class="validation-header">VALIDATION RESULTS</div>
+      <template x-for="item in validationResults" :key="item.module">
+        <div class="validation-row" :class="item.ok ? 'ok' : 'fail'">
+          <span class="v-status" x-text="item.ok ? '✓' : '✗'"></span>
+          <span class="v-module mono" x-text="item.module"></span>
+          <span class="v-message" x-text="item.message"></span>
+        </div>
+      </template>
+    </div>
+  </section>
+
+  <!-- ── Right: YAML preview ── -->
+  <aside class="yaml-panel">
+    <div class="yaml-header">YAML PREVIEW</div>
+    <pre class="yaml-content" x-text="yamlPreview"></pre>
+  </aside>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('configureApp', configureApp);
+});
+</script>
+{% endblock %}

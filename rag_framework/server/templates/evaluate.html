@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+{% block title %}Evaluate — RAG Framework{% endblock %}
+
+{% block content %}
+<div class="evaluate-layout" x-data="evaluateApp()">
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab" :class="{active: tab === 'ingest'}" @click="tab = 'ingest'">
+      <span class="tab-icon">⊕</span> Ingest
+    </button>
+    <button class="tab" :class="{active: tab === 'query'}" @click="tab = 'query'">
+      <span class="tab-icon">⊛</span> Query
+    </button>
+    <button class="tab" :class="{active: tab === 'compare'}" @click="tab = 'compare'">
+      <span class="tab-icon">⊞</span> Compare
+    </button>
+
+    <!-- Active config chip -->
+    <div class="tab-spacer"></div>
+    <div class="active-config-chip">
+      <span class="chip-dot"></span>
+      <span class="mono" x-text="activeConfigName"></span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ INGEST TAB ═══ -->
+  <div class="tab-content" x-show="tab === 'ingest'" x-transition>
+    <div class="two-col">
+
+      <!-- Left: Upload -->
+      <div class="panel">
+        <div class="panel-title-sm">DOCUMENT UPLOAD</div>
+
+        <div class="drop-zone"
+          :class="{dragover: dragging, 'has-files': files.length > 0}"
+          @dragover.prevent="dragging = true"
+          @dragleave="dragging = false"
+          @drop.prevent="handleDrop($event)"
+          @click="$refs.fileInput.click()"
+        >
+          <input type="file" multiple accept=".pdf" x-ref="fileInput"
+            style="display:none" @change="handleFileSelect($event)" />
+          <template x-if="files.length === 0">
+            <div class="drop-placeholder">
+              <span class="drop-icon">⊕</span>
+              <span>Drop PDFs here or click to browse</span>
+            </div>
+          </template>
+          <template x-if="files.length > 0">
+            <div class="file-list">
+              <template x-for="(f, i) in files" :key="i">
+                <div class="file-row">
+                  <span class="file-icon">▸</span>
+                  <span class="file-name mono" x-text="f.name"></span>
+                  <span class="file-size" x-text="formatBytes(f.size)"></span>
+                  <button class="file-remove" @click.stop="files.splice(i, 1)">✕</button>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+
+        <div class="action-bar" style="margin-top:16px">
+          <button class="btn btn-primary" @click="runIngestion()" :disabled="files.length === 0 || ingesting">
+            <span x-show="!ingesting">▶ Run Ingestion</span>
+            <span x-show="ingesting" class="loading-dots">Ingesting</span>
+          </button>
+          <button class="btn btn-danger" @click="resetStore()">⊘ Reset Store</button>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="progress-bar-wrap" x-show="ingesting">
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill animated"></div>
+          </div>
+          <span class="progress-label">Processing documents…</span>
+        </div>
+      </div>
+
+      <!-- Right: Results -->
+      <div class="panel">
+        <div class="panel-title-sm">INGESTION LOG</div>
+
+        <template x-if="ingestionResults === null && !ingesting">
+          <div class="empty-state">No ingestion run yet.</div>
+        </template>
+
+        <template x-if="ingestionResults !== null">
+          <div>
+            <!-- Summary cards -->
+            <div class="metric-cards">
+              <div class="metric-card">
+                <div class="metric-value accent" x-text="ingestionResults.summaries.length"></div>
+                <div class="metric-label">documents</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value accent" x-text="totalChunks()"></div>
+                <div class="metric-label">chunks</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value accent" x-text="avgParseTime() + 's'"></div>
+                <div class="metric-label">avg parse time</div>
+              </div>
+            </div>
+
+            <!-- Per-file table -->
+            <table class="data-table" style="margin-top:16px">
+              <thead>
+                <tr>
+                  <th>FILE</th><th>PAGES</th><th>CHUNKS</th><th>CHARS</th><th>PARSE TIME</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="s in ingestionResults.summaries" :key="s.filename">
+                  <tr>
+                    <td class="mono" x-text="s.filename"></td>
+                    <td x-text="s.page_count ?? '—'"></td>
+                    <td class="accent" x-text="s.chunk_count"></td>
+                    <td x-text="s.char_count?.toLocaleString() ?? '—'"></td>
+                    <td class="mono" x-text="s.parse_time_s ? s.parse_time_s + 's' : '—'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+
+            <!-- Errors -->
+            <template x-if="ingestionResults.errors.length > 0">
+              <div class="error-list">
+                <template x-for="e in ingestionResults.errors" :key="e.filename">
+                  <div class="error-row">✗ <span class="mono" x-text="e.filename"></span>: <span x-text="e.error"></span></div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ QUERY TAB ═══ -->
+  <div class="tab-content" x-show="tab === 'query'" x-transition>
+    <div class="query-layout">
+
+      <div class="panel">
+        <div class="panel-title-sm">QUERY INPUT</div>
+
+        <div class="query-input-wrap">
+          <textarea class="input-textarea" rows="3" placeholder="What is the main finding…"
+            x-model="queryText"
+            @keydown.ctrl.enter="runQuery()"
+            @keydown.meta.enter="runQuery()">
+          </textarea>
+          <div class="query-hint">⌘↵ to run</div>
+        </div>
+
+        <div class="field-row" style="margin-top:12px; align-items:center">
+          <div style="flex:1">
+            <div class="slider-header">
+              <label class="field-label">TOP-K</label>
+              <span class="slider-value mono" x-text="topK"></span>
+            </div>
+            <input type="range" class="range-input" min="1" max="20" step="1" x-model.number="topK" />
+          </div>
+          <button class="btn btn-primary" style="margin-left:16px;margin-top:16px"
+            @click="runQuery()" :disabled="!queryText.trim() || querying">
+            <span x-show="!querying">⊛ Retrieve</span>
+            <span x-show="querying" class="loading-dots">Retrieving</span>
+          </button>
+        </div>
+
+        <template x-if="queryError">
+          <div class="callout callout-error" x-text="queryError"></div>
+        </template>
+      </div>
+
+      <!-- Results -->
+      <div class="results-panel" x-show="queryResults.length > 0" x-transition>
+        <div class="panel-title-sm" x-text="`RESULTS — ${queryResults.length} chunks`"></div>
+        <template x-for="(r, i) in queryResults" :key="i">
+          <div class="result-card" :class="{'result-top': i === 0}">
+            <div class="result-header">
+              <span class="result-rank mono">#<span x-text="i + 1"></span></span>
+              <div class="score-bar-wrap">
+                <div class="score-bar" :style="`width: ${(r.score * 100).toFixed(0)}%`"></div>
+              </div>
+              <span class="result-score mono accent" x-text="r.score.toFixed(4)"></span>
+            </div>
+            <div class="result-text" x-text="r.text"></div>
+            <template x-if="Object.keys(r.metadata).length > 0">
+              <details class="result-meta">
+                <summary>metadata</summary>
+                <pre class="mono" x-text="JSON.stringify(r.metadata, null, 2)"></pre>
+              </details>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      <template x-if="queryResults.length === 0 && !querying">
+        <div class="empty-state">Run a query to see results.</div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ COMPARE TAB ═══ -->
+  <div class="tab-content" x-show="tab === 'compare'" x-transition>
+    <div class="compare-layout">
+
+      <!-- Config A vs B headers -->
+      <div class="compare-header-row">
+        <div class="compare-config-card active-config">
+          <div class="config-card-label">CONFIG A <span class="tag">active</span></div>
+          <div class="mono accent" x-text="activeConfigName"></div>
+        </div>
+        <div class="compare-vs">VS</div>
+        <div class="compare-config-card">
+          <div class="config-card-label">CONFIG B</div>
+          <template x-if="!configB">
+            <label class="btn btn-ghost" style="cursor:pointer; margin-top:8px">
+              ↑ Load YAML
+              <input type="file" accept=".yaml,.yml" style="display:none"
+                @change="loadConfigB($event)" />
+            </label>
+          </template>
+          <template x-if="configB">
+            <div>
+              <div class="mono" x-text="configB.name || 'config-b'"></div>
+              <label class="btn btn-ghost btn-sm" style="cursor:pointer; margin-top:6px">
+                Change
+                <input type="file" accept=".yaml,.yml" style="display:none"
+                  @change="loadConfigB($event)" />
+              </label>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Eval set editor -->
+      <div class="panel" style="margin-top:16px">
+        <div class="panel-title-sm">EVALUATION DATASET <span class="tag">JSON</span></div>
+        <textarea class="input-textarea code-textarea" rows="8" x-model="evalSetJson"></textarea>
+        <div class="field-hint">Array of { query, expected: [string] } objects.</div>
+
+        <div class="action-bar" style="margin-top:12px">
+          <button class="btn btn-primary" @click="runComparison()"
+            :disabled="!configB || comparing">
+            <span x-show="!comparing">⊞ Run Comparison</span>
+            <span x-show="comparing" class="loading-dots">Evaluating</span>
+          </button>
+          <template x-if="!configB">
+            <span class="field-hint">Load Config B first.</span>
+          </template>
+        </div>
+      </div>
+
+      <!-- Comparison results -->
+      <div x-show="comparisonResults" x-transition style="margin-top:16px">
+        <div class="comparison-legend">
+          <span class="legend-item"><span class="dot-a">●</span> Config A: <span class="mono" x-text="comparisonResults?.config_a_name"></span></span>
+          <span class="legend-item"><span class="dot-b">●</span> Config B: <span class="mono" x-text="comparisonResults?.config_b_name"></span></span>
+        </div>
+
+        <table class="data-table comparison-table">
+          <thead>
+            <tr>
+              <th>METRIC</th>
+              <th>CONFIG A</th>
+              <th>CONFIG B</th>
+              <th>ΔELTA</th>
+              <th>WINNER</th>
+              <th style="width:200px">BAR</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="row in comparisonResults?.comparison ?? []" :key="row.metric">
+              <tr>
+                <td class="mono" x-text="row.metric"></td>
+                <td class="mono" x-text="row.a"></td>
+                <td class="mono" x-text="row.b"></td>
+                <td class="mono" :class="row.delta > 0 ? 'positive' : (row.delta < 0 ? 'negative' : '')"
+                  x-text="(row.delta > 0 ? '+' : '') + row.delta"></td>
+                <td>
+                  <span class="winner-badge" :class="row.better"
+                    x-text="row.better === 'b' ? 'B ▲' : (row.better === 'a' ? 'A ▲' : '—')"></span>
+                </td>
+                <td>
+                  <div class="compare-bars">
+                    <div class="compare-bar-a" :style="`width: ${barPct(row.a, row)}%`"></div>
+                    <div class="compare-bar-b" :style="`width: ${barPct(row.b, row)}%`"></div>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('evaluateApp', evaluateApp);
+});
+</script>
+{% endblock %}
