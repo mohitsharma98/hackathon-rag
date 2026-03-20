@@ -4,6 +4,26 @@
 
 'use strict';
 
+// ── Theme toggle ────────────────────────────────────────────
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'light' ? 'dark' : 'light';
+  if (next === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    localStorage.setItem('theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.removeItem('theme');
+  }
+  _updateThemeIcon(next);
+}
+
+function _updateThemeIcon(theme) {
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.textContent = theme === 'light' ? '☾' : '☀';
+}
+
 // ── Shared API helpers ──────────────────────────────────────
 
 async function apiFetch(path, opts = {}) {
@@ -47,10 +67,11 @@ async function refreshStatusBar() {
   } catch (_) { /* silently ignore if server not up yet */ }
 }
 
-// Refresh status bar on load and every 15s
+// Refresh status bar on load and every 15s; sync theme icon
 document.addEventListener('DOMContentLoaded', () => {
   refreshStatusBar();
   setInterval(refreshStatusBar, 15000);
+  _updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'dark');
 });
 
 // ── YAML serialisation helper (client-side approximation) ───

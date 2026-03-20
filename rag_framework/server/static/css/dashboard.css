@@ -980,3 +980,74 @@ body {
 /* ── Transitions ────────────────────────────────────────────── */
 [x-cloak] { display: none !important; }
 [x-transition] { transition: opacity 0.15s ease; }
+
+/* ── Theme toggle button ────────────────────────────────────── */
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 9px;
+  margin-right: 12px;
+  line-height: 1;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.theme-toggle:hover {
+  color: var(--text-1);
+  border-color: var(--border-light);
+  background: var(--bg-3);
+}
+
+/* ── Light theme ────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-0:         #f5f8fd;
+  --bg-1:         #eef3fc;
+  --bg-2:         #e6edf8;
+  --bg-3:         #d8e4f3;
+  --bg-4:         #cad6ed;
+
+  --border:       #bacce0;
+  --border-light: #9eb7d5;
+  --border-glow:  rgba(0, 128, 184, 0.2);
+
+  --accent:       #0080b8;
+  --accent-dim:   rgba(0, 128, 184, 0.65);
+  --accent-glow:  rgba(0, 128, 184, 0.1);
+  --accent2:      #5b30d5;
+  --accent2-dim:  rgba(91, 48, 213, 0.55);
+
+  --ok:           #0aab55;
+  --ok-dim:       rgba(10, 171, 85, 0.18);
+  --error:        #cc2828;
+  --error-dim:    rgba(204, 40, 40, 0.15);
+  --warning:      #c47a00;
+  --warning-dim:  rgba(196, 122, 0, 0.15);
+
+  --text-1:       #0d1b30;
+  --text-2:       #374f70;
+  --text-3:       #6b82a0;
+}
+
+[data-theme="light"] body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 128, 184, 0.05), transparent),
+    radial-gradient(circle, var(--border) 1px, transparent 1px);
+}
+
+[data-theme="light"] .navbar {
+  background: rgba(245, 248, 253, 0.95);
+}
+
+[data-theme="light"] .statusbar {
+  background: rgba(238, 243, 252, 0.98);
+}
+
+[data-theme="light"] .brand-icon {
+  text-shadow: none;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track { background: var(--bg-1); }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: var(--border-light); }
