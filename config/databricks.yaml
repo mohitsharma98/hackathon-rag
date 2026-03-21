@@ -1,0 +1,38 @@
+name: rag-demo-databricks
+description: Databricks stack — recursive chunking + sentence-transformers embeddings + Databricks Vector Search (delta_sync)
+
+parser:
+  implementation: pdfplumber
+
+chunker:
+  implementation: recursive
+  chunk_size: 512
+  chunk_overlap: 64
+
+embedder:
+  implementation: sentence_transformers
+  local_model_name: all-MiniLM-L6-v2
+  device: cpu
+  batch_size: 32
+
+vector_store:
+  implementation: databricks
+  databricks_host: ""                  # set via DATABRICKS_HOST env var  e.g. https://<workspace>.azuredatabricks.net
+  databricks_token: ""                 # set via DATABRICKS_TOKEN env var
+  databricks_endpoint_name: ""        # name of your Vector Search endpoint
+  databricks_index_name: "data-internal.rag_data_services.embeddings"
+  databricks_index_type: delta_sync
+  databricks_source_table: "data-internal.rag_data_services.chunks"
+  databricks_trigger_sync: true        # trigger sync after each upsert (TRIGGERED pipelines)
+  embedding_dim: 384                   # all-MiniLM-L6-v2 output dim (ignored in delta_sync)
+
+retriever:
+  implementation: semantic
+  top_k: 5
+
+evaluator:
+  enable_retrieval_metrics: true
+  enable_parsing_metrics: true
+  enable_chunking_metrics: true
+  enable_answer_metrics: false
+  k_values: [1, 3, 5]
