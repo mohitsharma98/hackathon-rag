@@ -53,6 +53,7 @@ class PDFPlumberParser(BaseParser):
 
         return ParsedDocument(
             text=full_text,
+            pages=pages_text,
             metadata={
                 "source": file_path,
                 "parser": "pdfplumber",

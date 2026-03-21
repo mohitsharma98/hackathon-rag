@@ -122,8 +122,10 @@ function configureApp() {
       { value: 'azure_di',   label: 'Azure DI',   badge: 'cloud', desc: 'OCR, scanned docs' },
     ],
     chunkerOptions: [
-      { value: 'recursive', label: 'Recursive',  badge: 'default', desc: 'Character-based splitting' },
-      { value: 'semantic',  label: 'Semantic',   badge: 'advanced', desc: 'Embedding-guided boundaries' },
+      { value: 'recursive',  label: 'Recursive',  badge: 'default',  desc: 'Character-based splitting' },
+      { value: 'semantic',   label: 'Semantic',   badge: 'advanced', desc: 'Embedding-guided boundaries' },
+      { value: 'pagewise',   label: 'Page-wise',  badge: 'simple',   desc: 'One chunk per page' },
+      { value: 'paragraph',  label: 'Paragraph',  badge: 'simple',   desc: 'Split on blank lines' },
     ],
     embedderOptions: [
       { value: 'sentence_transformers', label: 'Sentence Transformers', badge: 'local',  desc: 'No API key needed' },
@@ -131,10 +133,11 @@ function configureApp() {
       { value: 'azure_openai',         label: 'Azure OpenAI',          badge: 'cloud',  desc: 'Azure deployment' },
     ],
     vectorStoreOptions: [
-      { value: 'chromadb',     label: 'ChromaDB',       badge: 'local',  desc: 'Persistent, no server' },
-      { value: 'qdrant_local', label: 'Qdrant local',   badge: 'local',  desc: 'On-disk HNSW index' },
-      { value: 'pinecone',     label: 'Pinecone',       badge: 'cloud',  desc: 'Managed vector DB' },
-      { value: 'azure_search', label: 'Azure AI Search',badge: 'cloud',  desc: 'Enterprise vector search' },
+      { value: 'chromadb',     label: 'ChromaDB',        badge: 'local',  desc: 'Persistent, no server' },
+      { value: 'qdrant_local', label: 'Qdrant local',    badge: 'local',  desc: 'On-disk HNSW index' },
+      { value: 'pinecone',     label: 'Pinecone',        badge: 'cloud',  desc: 'Managed vector DB' },
+      { value: 'azure_search', label: 'Azure AI Search', badge: 'cloud',  desc: 'Enterprise vector search' },
+      { value: 'databricks',   label: 'Databricks',      badge: 'cloud',  desc: 'Databricks Vector Search' },
     ],
     retrieverOptions: [
       { value: 'semantic', label: 'Semantic',  badge: 'default',  desc: 'Pure vector similarity' },
@@ -168,6 +171,11 @@ function configureApp() {
         qdrant_path: './.qdrant',
         pinecone_api_key: '', pinecone_index_name: 'rag-demo',
         azure_search_endpoint: '', azure_search_api_key: '', azure_search_index_name: 'rag-demo',
+        databricks_host: '', databricks_token: '',
+        databricks_endpoint_name: '', databricks_index_name: '',
+        databricks_index_type: 'direct_access',
+        databricks_source_table: '', databricks_embedding_model_endpoint: '',
+        databricks_trigger_sync: false,
         embedding_dim: 384,
       },
       retriever: {

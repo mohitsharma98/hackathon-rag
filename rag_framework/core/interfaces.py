@@ -24,6 +24,8 @@ class ParsedDocument:
     text: str
     metadata: dict[str, Any] = field(default_factory=dict)
     # e.g. {"source": "file.pdf", "page_count": 10, "parse_time_s": 0.4}
+    pages: list[str] = field(default_factory=list)
+    # Per-page text, populated by parsers that support page-level extraction.
 
 
 @dataclass

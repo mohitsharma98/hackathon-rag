@@ -27,6 +27,8 @@ class ParserImpl(str, Enum):
 class ChunkerImpl(str, Enum):
     recursive = "recursive"     # Recursive character splitting
     semantic = "semantic"       # Semantic / embedding-guided splitting
+    pagewise = "pagewise"       # One chunk per page
+    paragraph = "paragraph"     # Paragraph-boundary splitting
 
 
 class EmbedderImpl(str, Enum):

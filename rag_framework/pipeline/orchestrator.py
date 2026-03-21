@@ -197,6 +197,12 @@ def _build_chunker(config: PipelineConfig, pipeline: "RAGPipeline") -> BaseChunk
         # Semantic chunker needs an embedder — reuse the pipeline's embedder
         embedder = _build_embedder(config)
         return SemanticChunker(config.chunker, embedder)
+    elif impl == ChunkerImpl.pagewise:
+        from rag_framework.modules.chunking.page_chunker import PageChunker
+        return PageChunker(config.chunker)
+    elif impl == ChunkerImpl.paragraph:
+        from rag_framework.modules.chunking.paragraph_chunker import ParagraphChunker
+        return ParagraphChunker(config.chunker)
     raise UnsupportedImplementationError("chunker", impl, [e.value for e in ChunkerImpl])
 
 

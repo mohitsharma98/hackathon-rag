@@ -137,6 +137,36 @@
           <div class="callout callout-info">Semantic chunker uses the configured embedder — ensure it is set up first.</div>
         </div>
       </template>
+
+      <template x-if="config.chunker.implementation === 'pagewise'">
+        <div class="field-group">
+          <div class="callout callout-info">Each page of the document becomes one chunk. Requires a parser that provides per-page text (pdfplumber or PyMuPDF).</div>
+        </div>
+      </template>
+
+      <template x-if="config.chunker.implementation === 'paragraph'">
+        <div class="field-group">
+          <div class="slider-field">
+            <div class="slider-header">
+              <label class="field-label">MAX MERGE SIZE</label>
+              <span class="slider-value mono" x-text="config.chunker.chunk_size + ' chars'"></span>
+            </div>
+            <input type="range" class="range-input" min="64" max="2048" step="64"
+              x-model.number="config.chunker.chunk_size" @input="debouncedPreview()" />
+            <div class="range-marks"><span>64</span><span>512</span><span>1024</span><span>2048</span></div>
+          </div>
+          <div class="field-row">
+            <div class="field-col">
+              <label class="field-label">MAX CHUNK (chars)</label>
+              <input class="input-text" type="number" x-model.number="config.chunker.max_chunk_size" />
+            </div>
+            <div class="field-col">
+              <label class="field-label">OVERLAP (chars)</label>
+              <input class="input-text" type="number" x-model.number="config.chunker.chunk_overlap" />
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- EMBEDDER -->
@@ -278,6 +308,57 @@
             <label class="field-label">INDEX NAME</label>
             <input class="input-text" type="text" x-model="config.vector_store.azure_search_index_name" />
           </div>
+        </div>
+      </template>
+
+      <template x-if="config.vector_store.implementation === 'databricks'">
+        <div class="field-group" style="margin-top:12px">
+          <div class="field-row">
+            <div class="field-col">
+              <label class="field-label">WORKSPACE HOST</label>
+              <input class="input-text" type="text" placeholder="https://…azuredatabricks.net"
+                x-model="config.vector_store.databricks_host" />
+            </div>
+            <div class="field-col">
+              <label class="field-label">ACCESS TOKEN</label>
+              <input class="input-text" type="password" placeholder="dapi…"
+                x-model="config.vector_store.databricks_token" />
+            </div>
+          </div>
+          <div class="field-row" style="margin-top:12px">
+            <div class="field-col">
+              <label class="field-label">ENDPOINT NAME</label>
+              <input class="input-text" type="text" x-model="config.vector_store.databricks_endpoint_name" />
+            </div>
+            <div class="field-col">
+              <label class="field-label">INDEX NAME</label>
+              <input class="input-text" type="text" placeholder="catalog.schema.index"
+                x-model="config.vector_store.databricks_index_name" />
+            </div>
+          </div>
+          <div class="field-row" style="margin-top:12px">
+            <div class="field-col">
+              <label class="field-label">INDEX TYPE</label>
+              <select class="input-select" x-model="config.vector_store.databricks_index_type">
+                <option value="direct_access">direct_access</option>
+                <option value="delta_sync">delta_sync</option>
+              </select>
+            </div>
+          </div>
+          <template x-if="config.vector_store.databricks_index_type === 'delta_sync'">
+            <div class="field-row" style="margin-top:12px">
+              <div class="field-col">
+                <label class="field-label">SOURCE TABLE</label>
+                <input class="input-text" type="text" placeholder="catalog.schema.table"
+                  x-model="config.vector_store.databricks_source_table" />
+              </div>
+              <div class="field-col">
+                <label class="field-label">EMBEDDING MODEL ENDPOINT</label>
+                <input class="input-text" type="text" placeholder="databricks-bge-large-en"
+                  x-model="config.vector_store.databricks_embedding_model_endpoint" />
+              </div>
+            </div>
+          </template>
         </div>
       </template>
     </div>
