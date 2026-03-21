@@ -5,6 +5,7 @@ Run with:
     uvicorn rag_framework.server.app:app --reload --port 8000
 """
 
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -24,6 +25,10 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 # Jinja2 templates
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
+# Cache-busting version — changes on every server restart so browsers always
+# fetch the latest static assets.
+_STATIC_VERSION = str(int(time.time()))
+
 # API routers
 app.include_router(config.router)
 app.include_router(pipeline.router)
@@ -36,9 +41,13 @@ app.include_router(evaluate.router)
 
 @app.get("/", response_class=HTMLResponse)
 async def page_configure(request: Request):
-    return templates.TemplateResponse("configure.html", {"request": request})
+    return templates.TemplateResponse(
+        "configure.html", {"request": request, "static_v": _STATIC_VERSION}
+    )
 
 
 @app.get("/evaluate", response_class=HTMLResponse)
 async def page_evaluate(request: Request):
-    return templates.TemplateResponse("evaluate.html", {"request": request})
+    return templates.TemplateResponse(
+        "evaluate.html", {"request": request, "static_v": _STATIC_VERSION}
+    )
