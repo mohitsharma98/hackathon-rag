@@ -228,6 +228,9 @@ def _build_vector_store(config: PipelineConfig) -> BaseVectorStore:
     elif impl == VectorStoreImpl.azure_search:
         from rag_framework.modules.vectorstore.azure_search_store import AzureSearchStore
         return AzureSearchStore(config.vector_store)
+    elif impl == VectorStoreImpl.databricks:
+        from rag_framework.modules.vectorstore.databricks_vector_search_store import DatabricksVectorSearchStore
+        return DatabricksVectorSearchStore(config.vector_store)
     raise UnsupportedImplementationError("vector_store", impl, [e.value for e in VectorStoreImpl])
 
 

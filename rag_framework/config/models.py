@@ -36,10 +36,11 @@ class EmbedderImpl(str, Enum):
 
 
 class VectorStoreImpl(str, Enum):
-    pinecone = "pinecone"       # Pinecone (cloud)
-    azure_search = "azure_search"  # Azure AI Search (cloud)
-    chromadb = "chromadb"       # ChromaDB (local)
-    qdrant_local = "qdrant_local"  # Qdrant local (local)
+    pinecone = "pinecone"                           # Pinecone (cloud)
+    azure_search = "azure_search"                  # Azure AI Search (cloud)
+    databricks = "databricks"                      # Databricks Vector Search (cloud)
+    chromadb = "chromadb"                          # ChromaDB (local)
+    qdrant_local = "qdrant_local"                  # Qdrant local (local)
 
 
 class RetrieverImpl(str, Enum):
@@ -109,6 +110,15 @@ class VectorStoreConfig(BaseModel):
     # Qdrant local
     qdrant_path: str = "./.qdrant"
     qdrant_port: int = 6333
+    # Databricks Vector Search
+    databricks_host: str | None = None               # e.g. https://<workspace>.azuredatabricks.net
+    databricks_token: str | None = None              # PAT or service-principal secret
+    databricks_endpoint_name: str | None = None      # Vector Search endpoint name
+    databricks_index_name: str | None = None         # catalog.schema.index_name
+    databricks_index_type: str = "direct_access"     # "direct_access" | "delta_sync"
+    databricks_source_table: str | None = None       # Delta table for delta_sync mode
+    databricks_embedding_model_endpoint: str | None = None  # e.g. "databricks-bge-large-en"
+    databricks_trigger_sync: bool = False            # Trigger index sync after delta_sync upsert
     # Shared
     embedding_dim: int = 384   # Must match the embedder output size
     extra: dict[str, Any] = Field(default_factory=dict)

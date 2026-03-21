@@ -35,6 +35,12 @@ cloud = [
     "pinecone-client>=4.0",
 ]
 
+# Databricks stack
+databricks = [
+    "databricks-vectorsearch>=0.40",
+    "databricks-sdk>=0.28",
+]
+
 # UI — FastAPI server + Jinja2 templates (no Node.js required)
 ui = [
     "fastapi>=0.111",
@@ -53,7 +59,7 @@ dev = [
 
 # Install everything
 all = [
-    "rag-framework[local,cloud,ui,dev]",
+    "rag-framework[local,cloud,databricks,ui,dev]",
 ]
 
 [project.scripts]
