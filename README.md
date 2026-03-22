@@ -61,9 +61,107 @@ hackathon-rag/
 | **Parser** | `pdfplumber`, `PyMuPDF` | Azure Document Intelligence |
 | **Chunker** | Recursive (pure Python) | Semantic (uses Embedder) |
 | **Embedder** | `sentence-transformers` | OpenAI, Azure OpenAI |
-| **Vector Store** | ChromaDB, Qdrant local | Pinecone, Azure AI Search |
+| **Vector Store** | ChromaDB, Qdrant local | Pinecone, Azure AI Search, Databricks |
 | **Retriever** | Semantic (vector), Hybrid (BM25+vector) | — |
 | **Evaluator** | Pure Python metrics | LLM judge (optional) |
+
+---
+
+## Interface → Implementation map
+
+Every module is defined as an abstract base class in `rag_framework/core/interfaces.py`. Concrete implementations live under `rag_framework/modules/` and are selected at runtime via the config enum.
+
+```
+core/interfaces.py                    modules/
+─────────────────────────────────────────────────────────────────────────────
+
+BaseParser                            parsing/
+  .parse(file_path) → ParsedDocument  ├── AzureDIParser          (azure_di)
+  .health_check()                     │     creds: AZURE_DI_ENDPOINT + AZURE_DI_KEY
+                                      │     strength: OCR, tables, scanned docs
+                                      ├── pdfplumber parser       (pdfplumber)
+                                      └── PyMuPDF parser          (pymupdf)
+
+─────────────────────────────────────────────────────────────────────────────
+
+BaseChunker                           chunking/
+  .chunk(doc) → list[Chunk]           ├── RecursiveChunker        (recursive)
+  .health_check()                     │     params: chunk_size, chunk_overlap, separators
+                                      │     algo: split [\n\n → \n → ". " → " "] recursively
+                                      │             then merge + overlap pass
+                                      ├── SemanticChunker         (semantic)
+                                      │     params: similarity_threshold, min/max_chunk_size
+                                      │     algo: embedding-guided boundary detection
+                                      ├── pagewise chunker        (pagewise)
+                                      └── paragraph chunker       (paragraph)
+
+─────────────────────────────────────────────────────────────────────────────
+
+BaseEmbedder                          embedding/
+  .embed(texts) → list[list[float]]   ├── SentenceTransformerEmbedder  (sentence_transformers)
+  .health_check()                     │     model: all-MiniLM-L6-v2  dim=384  runs locally
+                                      ├── OpenAIEmbedder               (openai)
+                                      │     model: text-embedding-3-small/large  dim=1536
+                                      │     creds: OPENAI_API_KEY
+                                      └── AzureOpenAIEmbedder          (azure_openai)
+                                            creds: AZURE_OPENAI_API_KEY + AZURE_OPENAI_ENDPOINT
+
+─────────────────────────────────────────────────────────────────────────────
+
+BaseVectorStore                       vectorstore/
+  .upsert(embedded_chunks)            ├── ChromaDBStore           (chromadb)
+  .query(embedding, top_k)            │     local persistent, no creds, cosine distance
+  .delete_collection()                ├── QdrantLocalStore        (qdrant_local)
+  .health_check()                     │     local file-based
+                                      ├── PineconeStore           (pinecone)
+                                      │     creds: PINECONE_API_KEY  (index must pre-exist)
+                                      ├── AzureSearchStore        (azure_search)
+                                      │     creds: AZURE_SEARCH_ENDPOINT + AZURE_SEARCH_API_KEY
+                                      └── DatabricksVectorSearchStore  (databricks)
+                                            creds: DATABRICKS_HOST + DATABRICKS_TOKEN
+                                            ├── direct_access
+                                            │     upsert → sends pre-computed vectors
+                                            │     query  → similarity_search(vector)
+                                            └── delta_sync
+                                                  upsert → writes rows to Delta table
+                                                           Databricks auto-embeds via FM endpoint
+                                                  query  → similarity_search(query_text)
+
+─────────────────────────────────────────────────────────────────────────────
+
+BaseRetriever                         retrieval/
+  .retrieve(query) → list[Result]     ├── SemanticRetriever       (semantic)
+  .health_check()                     │     composes: Embedder + VectorStore
+                                      │     flow: query → embed → .query(vector)
+                                      └── HybridRetriever         (hybrid)
+                                            composes: Embedder + VectorStore + BM25
+                                            flow: embed path  →  vector score  × 0.7
+                                                  BM25 path   →  keyword score × 0.3
+                                            requires: rank_bm25, corpus at init
+
+─────────────────────────────────────────────────────────────────────────────
+
+BaseEvaluator                         evaluation/
+  .evaluate(queries, expected,        └── RAGEvaluator
+            retrieved, answers)             metric groups (each toggleable in config):
+    → EvaluationReport                      ├── retrieval  → Recall@K, Precision@K, MRR, NDCG
+  .health_check()                           ├── parsing    → char count, latency, completeness
+                                            ├── chunking   → chunk count, avg length, variance
+                                            └── answer     → LLM judge (gpt-4o-mini, off by default)
+```
+
+### Key design rule
+
+Every implementation follows the same four-step contract:
+
+```
+__init__(config)     store config, set all clients to None (lazy init)
+health_check()       validate credentials and imports — fail-fast before any work
+core method(...)     parse / chunk / embed / upsert / query / evaluate
+_get_client()        SDK client created on first use, then cached
+```
+
+The `Retriever` is the only module that **composes** others — it holds a `BaseEmbedder` and a `BaseVectorStore` instance rather than owning its own SDK client.
 
 ---
 
@@ -189,6 +287,8 @@ Errors surface as typed exceptions from `rag_framework.core.exceptions`.
 | `PINECONE_API_KEY` | Vector Store | Pinecone |
 | `AZURE_SEARCH_ENDPOINT` | Vector Store | Azure AI Search |
 | `AZURE_SEARCH_API_KEY` | Vector Store | Azure AI Search |
+| `DATABRICKS_HOST` | Vector Store | Databricks Vector Search |
+| `DATABRICKS_TOKEN` | Vector Store | Databricks Vector Search |
 
 ---
 
