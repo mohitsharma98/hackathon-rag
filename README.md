@@ -1,19 +1,8 @@
-# RAG Framework Demo
+# RAG Framework
 
-A **modular, evaluation-first** Retrieval-Augmented Generation (RAG) framework built for a 10-day hackathon demo.
+A **modular, evaluation-first** Retrieval-Augmented Generation (RAG) framework.
 
-> **Goal:** Prove that RAG design choices can be compared quantitatively, and that every major component is swappable — from a UI — without code edits.
-
----
-
-## What this demo proves
-
-| # | Claim | How |
-|---|-------|-----|
-| 1 | Each module supports swappable implementations | Abstract base classes + factory pattern |
-| 2 | Cloud and local options exist per module | See module table below |
-| 3 | Pipeline is UI-configurable, no code edits needed | Streamlit UI + YAML export/import |
-| 4 | Design decisions are backed by metrics | Built-in evaluator with Recall@K, MRR, NDCG, latency |
+> **Goal:** RAG design choices can be compared quantitatively, and every major component is swappable — from a UI — without code edits.
 
 ---
 
@@ -312,11 +301,3 @@ To add a new implementation (e.g. a new parser):
 
 ---
 
-## Demo script (10-minute walkthrough)
-
-1. Open the UI: `uvicorn rag_framework.server.app:app --reload --port 8000`
-2. **Configure** tab → select local stack → click **Validate backends** → all green.
-3. **Evaluate** tab → upload a PDF → click **Run Ingestion** → see chunk count + parse time.
-4. **Query** tab → ask a question → inspect retrieved chunks + scores.
-5. **Compare** tab → upload `config/cloud.yaml` → run comparison → show metric table.
-6. Discuss delta in Recall@5 and latency — this is your quantitative design argument.
