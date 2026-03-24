@@ -55,17 +55,29 @@ class AzureDIParser(BaseParser):
 
         t0 = time.perf_counter()
 
+        # /dbfs/Volumes/... is not a valid FUSE path for Unity Catalog Volumes.
+        # The correct path is /Volumes/... (no /dbfs/ prefix).
+        local_path = file_path
+        if local_path.startswith("/dbfs/Volumes/"):
+            local_path = local_path[len("/dbfs"):]
+
+        try:
+            with open(local_path, "rb") as f:
+                file_bytes = f.read()
+        except OSError as e:
+            raise ParsingError(f"Cannot read file '{local_path}': {e}") from e
+
         try:
             client = DocumentIntelligenceClient(
                 endpoint=self.endpoint,
                 credential=AzureKeyCredential(self.api_key),
             )
-            with open(file_path, "rb") as f:
-                poller = client.begin_analyze_document(
-                    model_id=self.model_id,
-                    body=f,
-                    content_type="application/octet-stream",
-                )
+            import io
+            poller = client.begin_analyze_document(
+                model_id=self.model_id,
+                body=io.BytesIO(file_bytes),
+                content_type="application/octet-stream",
+            )
             result = poller.result()
         except Exception as e:
             if "401" in str(e) or "403" in str(e):
