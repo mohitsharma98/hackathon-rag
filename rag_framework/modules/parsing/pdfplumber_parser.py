@@ -2,32 +2,30 @@
 Local PDF parser using pdfplumber.
 
 Supports local paths and Databricks / cloud storage URIs:
-  - dbfs:/...        → copied via Databricks dbutils
-  - abfss://...      → copied via Databricks dbutils
-  - wasbs://...      → copied via Databricks dbutils
-  - /dbfs/...        → used directly (already a local FUSE mount path)
+  - /dbfs/...        → used directly via FUSE mount
+  - dbfs:/...        → read into memory via Hadoop FS (no temp files)
+  - abfss://...      → read into memory via Hadoop FS (no temp files)
+  - wasbs://...      → read into memory via Hadoop FS (no temp files)
   - any other path   → treated as a local filesystem path
 """
 
-import shutil
-import tempfile
+import io
 import time
 
 from rag_framework.config.models import ParserConfig
 from rag_framework.core.exceptions import ParsingError
 from rag_framework.core.interfaces import BaseParser, ParsedDocument
 
-# URI schemes that require downloading to a local temp file before parsing
 _REMOTE_SCHEMES = ("dbfs:/", "abfss://", "wasbs://", "abfs://", "s3://", "gs://")
 
 
 class PDFPlumberParser(BaseParser):
     """
-    Parses PDF files locally using pdfplumber.
+    Parses PDF files using pdfplumber.
 
     Accepts local paths and Databricks/cloud storage URIs.
-    Remote files are copied to a temp directory first via dbutils (on Databricks)
-    or the standard urllib for other schemes.
+    Remote files are read directly into memory (BytesIO) — no temp files or
+    filesystem copies required.
 
     Strengths : handles complex layouts, tables, multi-column text.
     Limitation: slower than PyMuPDF on large files.
@@ -37,7 +35,6 @@ class PDFPlumberParser(BaseParser):
         self.config = config
 
     def health_check(self) -> None:
-        """Verify pdfplumber is importable."""
         try:
             import pdfplumber  # noqa: F401
         except ImportError as e:
@@ -52,22 +49,19 @@ class PDFPlumberParser(BaseParser):
         except ImportError as e:
             raise ImportError("pdfplumber is not installed.") from e
 
-        local_path, _tmp_dir = self._resolve_local_path(file_path)
+        file_obj = self._open(file_path)
 
         t0 = time.perf_counter()
         pages_text: list[str] = []
 
         try:
-            with pdfplumber.open(local_path) as pdf:
+            with pdfplumber.open(file_obj) as pdf:
                 page_count = len(pdf.pages)
                 for page in pdf.pages:
                     text = page.extract_text() or ""
                     pages_text.append(text)
         except Exception as e:
             raise ParsingError(f"pdfplumber failed on '{file_path}': {e}") from e
-        finally:
-            if _tmp_dir:
-                shutil.rmtree(_tmp_dir, ignore_errors=True)
 
         full_text = "\n\n".join(pages_text)
         elapsed = time.perf_counter() - t0
@@ -89,48 +83,38 @@ class PDFPlumberParser(BaseParser):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _resolve_local_path(file_path: str) -> tuple[str, str | None]:
+    def _open(file_path: str) -> str | io.BytesIO:
         """
-        Return (local_path, tmp_dir_to_cleanup).
+        Return a local path string or an in-memory BytesIO for remote URIs.
 
-        If file_path is already local, returns (file_path, None).
-        If it's a remote/DBFS URI, copies it to a temp dir and returns
-        (temp_local_path, tmp_dir).
+        /dbfs/ paths are returned as-is (FUSE mount, already local).
+        All other remote URIs are read into BytesIO via the Hadoop FS API
+        — no temp files or filesystem copies needed.
         """
-        # /dbfs/ is the FUSE mount — directly accessible as a local path
+        # FUSE mount — directly accessible as a normal local path
         if file_path.startswith("/dbfs/"):
-            return file_path, None
+            return file_path
 
+        # Plain local path
         if not any(file_path.startswith(scheme) for scheme in _REMOTE_SCHEMES):
-            return file_path, None
+            return file_path
 
-        tmp_dir = tempfile.mkdtemp()
-        filename = file_path.split("/")[-1] or "file.pdf"
-        local_path = f"{tmp_dir}/{filename}"
-
-        if file_path.startswith(("dbfs:/", "abfss://", "wasbs://", "abfs://")):
-            # Use Databricks dbutils — available in notebook and job contexts
-            try:
-                from pyspark.dbutils import DBUtils  # noqa: F401
-                from pyspark.sql import SparkSession
-                spark = SparkSession.getActiveSession()
-                if spark is None:
-                    raise RuntimeError("No active SparkSession.")
-                dbutils = DBUtils(spark)
-                dbutils.fs.cp(file_path, f"file:{local_path}")
-            except Exception as e:
-                raise ParsingError(
-                    f"Failed to copy '{file_path}' via dbutils: {e}. "
-                    "Ensure this runs inside a Databricks cluster."
-                ) from e
-        else:
-            # Generic fallback for s3://, gs://, etc.
-            try:
-                import urllib.request
-                urllib.request.urlretrieve(file_path, local_path)
-            except Exception as e:
-                raise ParsingError(
-                    f"Failed to download '{file_path}': {e}"
-                ) from e
-
-        return local_path, tmp_dir
+        # Remote URI — read bytes into memory via Hadoop FS (Databricks)
+        try:
+            from pyspark.sql import SparkSession
+            spark = SparkSession.getActiveSession()
+            if spark is None:
+                raise RuntimeError("No active SparkSession.")
+            hadoop_conf = spark.sparkContext._jsc.hadoopConfiguration()
+            uri = spark.sparkContext._jvm.java.net.URI(file_path)
+            fs = spark.sparkContext._jvm.org.apache.hadoop.fs.FileSystem.get(uri, hadoop_conf)
+            path = spark.sparkContext._jvm.org.apache.hadoop.fs.Path(file_path)
+            stream = fs.open(path)
+            byte_array = spark.sparkContext._jvm.org.apache.commons.io.IOUtils.toByteArray(stream)
+            stream.close()
+            return io.BytesIO(bytes(byte_array))
+        except Exception as e:
+            raise ParsingError(
+                f"Failed to read '{file_path}' via Hadoop FS: {e}. "
+                "Ensure this runs inside a Databricks cluster."
+            ) from e
