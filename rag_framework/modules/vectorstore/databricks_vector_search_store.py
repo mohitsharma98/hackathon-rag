@@ -31,6 +31,17 @@ from rag_framework.core.exceptions import (
 from rag_framework.core.interfaces import BaseVectorStore, Chunk, EmbeddedChunk, RetrievalResult
 
 
+def _sql_quote(table_name: str) -> str:
+    """Backtick-quote each part of a UC table name for use in Spark SQL / saveAsTable.
+
+    Plain names work fine for the Vector Search SDK, but Spark SQL's identifier
+    parser rejects parts that contain hyphens (e.g. catalog names like
+    'data-internal').  This function strips any existing backticks and re-quotes
+    every part unconditionally so callers don't have to think about it.
+    """
+    return ".".join(f"`{p.strip('`')}`" for p in table_name.split("."))
+
+
 class DatabricksVectorSearchStore(BaseVectorStore):
     """
     Stores and queries vectors using Databricks Vector Search.
@@ -233,7 +244,7 @@ class DatabricksVectorSearchStore(BaseVectorStore):
         ]
         try:
             df = spark.createDataFrame(rows)
-            df.write.mode("append").saveAsTable(self.config.databricks_source_table)
+            df.write.mode("append").saveAsTable(_sql_quote(self.config.databricks_source_table))
         except Exception as e:
             raise VectorStoreError(
                 f"DatabricksVectorSearch delta_sync write failed: {e}"
