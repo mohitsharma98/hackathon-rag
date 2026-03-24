@@ -237,7 +237,7 @@ class PipelineConfig(BaseModel):
     def to_minimal_dict(self) -> dict[str, Any]:
         """Return only the fields relevant to each selected implementation."""
         _always = {"implementation", "extra"}
-        d = self.model_dump()
+        d = self.model_dump(mode="json")
         return {
             "name": d["name"],
             "description": d["description"],
