@@ -54,6 +54,54 @@ class RetrieverImpl(str, Enum):
 # Per-module config blocks
 # ---------------------------------------------------------------------------
 
+_PARSER_FIELDS: dict[str, set[str]] = {
+    "azure_di":   {"azure_endpoint", "azure_api_key", "azure_model_id"},
+    "pdfplumber": {"extract_images"},
+    "pymupdf":    {"extract_images"},
+}
+
+_CHUNKER_FIELDS: dict[str, set[str]] = {
+    "recursive":  {"chunk_size", "chunk_overlap", "separators"},
+    "paragraph":  {"chunk_size", "chunk_overlap"},
+    "semantic":   {"similarity_threshold", "min_chunk_size", "max_chunk_size"},
+    "pagewise":   set(),
+}
+
+_EMBEDDER_FIELDS: dict[str, set[str]] = {
+    "openai":                {"api_key", "model"},
+    "azure_openai":          {"api_key", "model", "azure_endpoint", "azure_api_version", "azure_deployment"},
+    "sentence_transformers": {"local_model_name", "device", "batch_size"},
+}
+
+_VECTOR_STORE_FIELDS: dict[str, set[str]] = {
+    "pinecone":     {"pinecone_api_key", "pinecone_index_name", "pinecone_environment"},
+    "azure_search": {"azure_search_endpoint", "azure_search_api_key", "azure_search_index_name"},
+    "chromadb":     {"chromadb_path"},
+    "qdrant_local": {"qdrant_path", "qdrant_port"},
+    "databricks":   {
+        "databricks_host", "databricks_token", "databricks_endpoint_name",
+        "databricks_index_name", "databricks_index_type", "databricks_source_table",
+        "databricks_embedding_model_endpoint", "databricks_trigger_sync",
+    },
+}
+
+_RETRIEVER_FIELDS: dict[str, set[str]] = {
+    "semantic": set(),
+    "hybrid":   {"bm25_weight", "vector_weight"},
+}
+
+
+def _filter_by_impl(
+    data: dict[str, Any],
+    impl_key: str,
+    field_map: dict[str, set[str]],
+    always: set[str],
+) -> dict[str, Any]:
+    """Keep only fields in `always` plus those relevant to the selected implementation."""
+    relevant = always | field_map.get(impl_key, set())
+    return {k: v for k, v in data.items() if k in relevant}
+
+
 class ParserConfig(BaseModel):
     implementation: ParserImpl = ParserImpl.pdfplumber
     # Azure Document Intelligence options
@@ -186,9 +234,36 @@ class PipelineConfig(BaseModel):
     # Serialization helpers
     # ------------------------------------------------------------------
 
+    def to_minimal_dict(self) -> dict[str, Any]:
+        """Return only the fields relevant to each selected implementation."""
+        _always = {"implementation", "extra"}
+        d = self.model_dump()
+        return {
+            "name": d["name"],
+            "description": d["description"],
+            "parser": _filter_by_impl(
+                d["parser"], d["parser"]["implementation"], _PARSER_FIELDS, _always,
+            ),
+            "chunker": _filter_by_impl(
+                d["chunker"], d["chunker"]["implementation"], _CHUNKER_FIELDS, _always,
+            ),
+            "embedder": _filter_by_impl(
+                d["embedder"], d["embedder"]["implementation"], _EMBEDDER_FIELDS, _always,
+            ),
+            "vector_store": _filter_by_impl(
+                d["vector_store"], d["vector_store"]["implementation"],
+                _VECTOR_STORE_FIELDS, _always | {"collection_name", "embedding_dim"},
+            ),
+            "retriever": _filter_by_impl(
+                d["retriever"], d["retriever"]["implementation"],
+                _RETRIEVER_FIELDS, _always | {"top_k"},
+            ),
+            "evaluator": d["evaluator"],
+        }
+
     def to_yaml(self) -> str:
-        """Export config to a YAML string."""
-        return yaml.dump(self.model_dump(), default_flow_style=False, sort_keys=False)
+        """Export config to a YAML string (only fields relevant to selected implementations)."""
+        return yaml.dump(self.to_minimal_dict(), default_flow_style=False, sort_keys=False)
 
     @classmethod
     def from_yaml(cls, yaml_str: str) -> "PipelineConfig":
