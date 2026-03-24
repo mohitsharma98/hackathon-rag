@@ -3,7 +3,30 @@ Cloud PDF parser using Azure Document Intelligence.
 """
 
 import os
+import site
+import sys
 import time
+
+
+def _fix_azure_namespace() -> None:
+    """Extend the azure namespace path to include all site-packages directories.
+
+    Databricks cluster libraries are installed in a separate site-packages
+    directory that Python's import system discovers correctly, but the ``azure``
+    namespace package may have already been initialised from the default
+    Databricks environment before the cluster-library path was added to
+    ``sys.path``.  When that happens ``azure.ai`` is not found even though the
+    package is physically present.  Patching ``azure.__path__`` fixes it.
+    """
+    if "azure" not in sys.modules:
+        return
+    import azure  # noqa: PLC0415
+    existing = set(azure.__path__)
+    for sp in site.getsitepackages():
+        candidate = os.path.join(sp, "azure")
+        if os.path.isdir(candidate) and candidate not in existing:
+            azure.__path__.append(candidate)
+            existing.add(candidate)
 
 from rag_framework.config.models import ParserConfig
 from rag_framework.core.exceptions import BackendConnectionError, MissingCredentialError, ParsingError
@@ -30,6 +53,7 @@ class AzureDIParser(BaseParser):
             raise MissingCredentialError("AZURE_DI_ENDPOINT")
         if not self.api_key:
             raise MissingCredentialError("AZURE_DI_KEY")
+        _fix_azure_namespace()
         try:
             from azure.ai.documentintelligence import DocumentIntelligenceClient  # noqa: F401
         except ImportError as e:
