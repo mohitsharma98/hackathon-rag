@@ -34,8 +34,8 @@ class AzureDIParser(BaseParser):
             from azure.ai.documentintelligence import DocumentIntelligenceClient  # noqa: F401
         except ImportError as e:
             raise ImportError(
-                "azure-ai-documentintelligence is not installed. "
-                "Run: pip install azure-ai-documentintelligence"
+                f"azure-ai-documentintelligence is not importable ({e}). "
+                "If the package is installed, try: pip install --upgrade --force-reinstall azure-ai-documentintelligence"
             ) from e
         # TODO: make a lightweight connectivity check (e.g. list models) to confirm auth
 
