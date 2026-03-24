@@ -19,6 +19,7 @@ Two modes controlled by VectorStoreConfig.databricks_index_type:
 
 from __future__ import annotations
 
+import json
 import os
 import uuid
 
@@ -238,7 +239,7 @@ class DatabricksVectorSearchStore(BaseVectorStore):
             Row(
                 chunk_id=str(ec.chunk.index) if ec.chunk.index >= 0 else str(uuid.uuid4()),
                 text=ec.chunk.text,
-                **{k: str(v) for k, v in ec.chunk.metadata.items()},
+                metadata=json.dumps({k: str(v) for k, v in ec.chunk.metadata.items()}),
             )
             for ec in embedded_chunks
         ]
