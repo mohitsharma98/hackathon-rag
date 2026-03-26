@@ -26,6 +26,10 @@ class ParsedDocument:
     # e.g. {"source": "file.pdf", "page_count": 10, "parse_time_s": 0.4}
     pages: list[str] = field(default_factory=list)
     # Per-page text, populated by parsers that support page-level extraction.
+    tables: list[dict[str, Any]] = field(default_factory=list)
+    # Extracted tables. Each entry: {"page_number": int, "row_count": int,
+    # "column_count": int, "data": list[list[str]], "markdown": str}
+    # Populated by parsers that support table extraction (e.g. azure_di).
 
 
 @dataclass

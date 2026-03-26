@@ -6,6 +6,7 @@ import os
 import site
 import sys
 import time
+from collections import defaultdict
 
 
 def _fix_azure_namespace() -> None:
@@ -108,17 +109,51 @@ class AzureDIParser(BaseParser):
                 raise BackendConnectionError("Azure Document Intelligence", f"Auth failed: {e}") from e
             raise ParsingError(f"Azure DI failed on '{file_path}': {e}") from e
 
-        # Extract text from all paragraphs across all pages
-        paragraphs = []
         page_count = len(result.pages) if result.pages else 0
-        for paragraph in (result.paragraphs or []):
-            paragraphs.append(paragraph.content)
 
-        full_text = "\n\n".join(paragraphs)
+        # Group paragraphs by page number to populate per-page text
+        page_texts: dict[int, list[str]] = defaultdict(list)
+        for paragraph in (result.paragraphs or []):
+            page_num = (
+                paragraph.bounding_regions[0].page_number
+                if paragraph.bounding_regions else 1
+            )
+            page_texts[page_num].append(paragraph.content)
+
+        pages = ["\n\n".join(page_texts[i]) for i in range(1, page_count + 1)]
+        full_text = "\n\n".join(p for p in pages if p)
+
+        # Extract tables
+        tables = []
+        for table in (result.tables or []):
+            page_num = (
+                table.bounding_regions[0].page_number
+                if table.bounding_regions else 1
+            )
+            grid = [[""] * table.column_count for _ in range(table.row_count)]
+            for cell in (table.cells or []):
+                grid[cell.row_index][cell.column_index] = cell.content
+
+            md_rows = []
+            for r, row in enumerate(grid):
+                md_rows.append("| " + " | ".join(row) + " |")
+                if r == 0:
+                    md_rows.append("| " + " | ".join(["---"] * table.column_count) + " |")
+
+            tables.append({
+                "page_number": page_num,
+                "row_count": table.row_count,
+                "column_count": table.column_count,
+                "data": grid,
+                "markdown": "\n".join(md_rows),
+            })
+
         elapsed = time.perf_counter() - t0
 
         return ParsedDocument(
             text=full_text,
+            pages=pages,
+            tables=tables,
             metadata={
                 "source": file_path,
                 "parser": "azure_di",
